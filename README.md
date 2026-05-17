@@ -71,13 +71,13 @@ Preuve visuelle :
 
 - La doc Prometheus sur `file_sd_configs` apparait dans `image/Screenshot_1.png` et `image/Screenshot_2.png`
 - L'interface `Targets` montre d'abord 2 cibles UP dans `image/Screenshot_3.png`
-- Puis 3 cibles UP apres ajout de `demo-api` dans `image/Screenshot_12.png`
 
 Illustration :
 
-![Doc file_sd_configs](image/Screenshot_2.png)
+![Doc file_sd_configs 1 sur 2](image/Screenshot_1.png)
+![Doc file_sd_configs 2 sur 2](image/Screenshot_2.png)
 ![Targets 2 sur 2](image/Screenshot_3.png)
-![Targets 3 sur 3](image/Screenshot_12.png)
+
 
 ### Exercice 5 - Recording rules
 
@@ -90,9 +90,9 @@ La regle d'enregistrement est dans [`rules/api_rules.yml`](rules/api_rules.yml) 
 
 Preuves :
 
-- la doc sur `rule_files` : `image/Screenshot_4.png`
-- la page Prometheus `Rules` : `image/Screenshot_5.png`
-- la prise en compte finale en statut `OK` : `image/Screenshot_27.png`
+- la doc sur `rule_files` : ![image_4](image/Screenshot_4.png)
+- la page Prometheus `Rules` : ![image_5](image/Screenshot_5.png)
+- la doc complete :  ![Doc file_sd_configs 2 sur 2](image/Screenshot_31.png)
 
 Point important note pendant le TP :
 
