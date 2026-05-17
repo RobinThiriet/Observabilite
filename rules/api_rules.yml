@@ -1,0 +1,72 @@
+groups:
+  - name: api.rules
+    interval: 30s
+    rules:
+      # Exercice 5 - Recording rule existante
+      - record: job:demo_http_requests:rate5m
+        expr: sum by (job) (rate(demo_http_requests_total[5m]))
+
+      # Exercice 8a - Taux de requêtes total par endpoint
+      - record: demo_api:requests:rate1m_by_endpoint
+        expr: |
+          sum by (endpoint) (
+            rate(demo_http_requests_total[1m])
+          )
+
+      # Exercice 8b - Ratio d'erreurs HTTP 5xx par endpoint
+      - record: demo_api:error_ratio:rate1m_by_endpoint
+        expr: |
+          sum by (endpoint) (
+            rate(demo_http_requests_total{status=~"5.."}[1m])
+          )
+          /
+          sum by (endpoint) (
+            rate(demo_http_requests_total[1m])
+          )
+
+      # Exercice 8c - Top 3 du taux de requêtes par instance
+      - record: demo_api:requests:rate1m_top3_by_instance
+        expr: |
+          topk(3,
+            sum by (instance) (
+              rate(demo_http_requests_total[1m])
+            )
+          )
+
+      # Exercice 9 - Latence p95 de /api/orders sur 5 minutes
+      - record: demo_api:orders_latency:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, endpoint) (
+              rate(demo_http_request_duration_seconds_bucket{endpoint="/api/orders"}[5m])
+            )
+          )
+
+      # Exercice 9 - Latence p95 de /api/orders en millisecondes
+      - record: demo_api:orders_latency:p95_5m_ms
+        expr: |
+          1000 *
+          histogram_quantile(
+            0.95,
+            sum by (le, endpoint) (
+              rate(demo_http_request_duration_seconds_bucket{endpoint="/api/orders"}[5m])
+            )
+          )
+
+      # Exercice 9 - Prédiction du total de requêtes dans 1h
+      # Version avec fenêtre courte pour le TP, plus pratique si demo-api tourne depuis peu.
+      - record: demo_api:requests:predict_1h_total
+        expr: |
+          predict_linear(
+            sum(demo_http_requests_total)[5m:10s],
+            3600
+          )
+
+      # Exercice 9 - Prédiction du nombre de requêtes dans 1h par endpoint
+      - record: demo_api:requests:predict_1h_by_endpoint
+        expr: |
+          predict_linear(
+            sum by (endpoint) (demo_http_requests_total)[5m:10s],
+            3600
+          )

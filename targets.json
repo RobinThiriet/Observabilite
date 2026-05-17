@@ -1,0 +1,20 @@
+[
+  {
+    "targets": ["prometheus:9090"],
+    "labels": {
+      "service": "prometheus"
+    }
+  },
+  {
+    "targets": ["node:9100"],
+    "labels": {
+      "service": "node"
+    }
+  },
+  {
+    "targets": ["demo-api:8000"],
+    "labels": {
+      "service": "demo-api"
+    }
+  }
+]
