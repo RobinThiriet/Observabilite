@@ -56,6 +56,16 @@ A regarder :
 - `docker-compose.yml`
 - l'onglet `Status > Targets`
 
+Ce que j'ai ajoute :
+
+```yaml
+prometheus:
+  image: prom/prometheus:latest
+  container_name: prometheus
+  ports:
+    - "9090:9090"
+```
+
 Capture d'appui :
 
 ![Prometheus Targets](image/Screenshot_3.png)
@@ -79,6 +89,24 @@ Points a comprendre :
 - role de `external_labels`
 - utilite de `--web.enable-lifecycle`
 
+Ce que j'ai ajoute :
+
+```yaml
+global:
+  scrape_interval: 10s
+  external_labels:
+    environment: lab
+```
+
+Et dans `docker-compose.yml` pour autoriser le reload :
+
+```yaml
+prometheus:
+  command:
+    - "--config.file=/etc/prometheus/prometheus.yml"
+    - "--web.enable-lifecycle"
+```
+
 Capture d'appui :
 
 ![Prometheus config exemple](image/Screenshot_7.png)
@@ -98,6 +126,16 @@ A regarder :
 Point utile :
 
 - si la cible est `UP`, tu peux ensuite tester des metriques comme `node_cpu_seconds_total`
+
+Ce que j'ai ajoute :
+
+```yaml
+node:
+  image: prom/node-exporter:latest
+  container_name: node
+  ports:
+    - "9100:9100"
+```
 
 Capture d'appui :
 
@@ -120,6 +158,44 @@ Ce qu'il faut retenir :
 - `file_sd_configs` permet a Prometheus de charger des cibles depuis un fichier JSON
 - ici les 3 cibles sont `prometheus`, `node` et `demo-api`
 
+Ce que j'ai ajoute :
+
+Dans `prometheus.yml` :
+
+```yaml
+scrape_configs:
+  - job_name: "file-discovery"
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/sd/*.json
+        refresh_interval: 5s
+```
+
+Dans `targets.json` :
+
+```json
+[
+  {
+    "targets": ["prometheus:9090"],
+    "labels": {
+      "service": "prometheus"
+    }
+  },
+  {
+    "targets": ["node:9100"],
+    "labels": {
+      "service": "node"
+    }
+  },
+  {
+    "targets": ["demo-api:8000"],
+    "labels": {
+      "service": "demo-api"
+    }
+  }
+]
+```
+
 Captures d'appui :
 
 ![Doc file_sd_configs](image/Screenshot_2.png)
@@ -140,10 +216,39 @@ Attention :
 
 - le montage Docker doit pointer vers le dossier `rules/`, pas vers un seul fichier
 
+Ce que j'ai ajoute :
+
+Dans `prometheus.yml` :
+
+```yaml
+rule_files:
+  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/alerts/*.yml
+```
+
+Dans `docker-compose.yml` :
+
+```yaml
+prometheus:
+  volumes:
+    - ./rules:/etc/prometheus/rules
+```
+
+Dans `rules/api_rules.yml` :
+
+```yaml
+groups:
+  - name: api.rules
+    interval: 30s
+    rules:
+      - record: job:demo_http_requests:rate5m
+        expr: sum by (job) (rate(demo_http_requests_total[5m]))
+```
+
 Captures d'appui :
 
 ![Doc rule_files](image/Screenshot_4.png)
-
+![Rules chargees](image/Screenshot_27.png)
 
 ### Exercice 6 - Alertes et Alertmanager
 
@@ -164,6 +269,50 @@ Points a comprendre :
 - difference entre recording rule et alerting rule
 - role du `for: 2m`
 - cheminement Prometheus -> Alertmanager
+
+Ce que j'ai ajoute :
+
+Dans `docker-compose.yml` :
+
+```yaml
+alertmanager:
+  image: prom/alertmanager:latest
+  container_name: alertmanager
+  ports:
+    - "9093:9093"
+  volumes:
+    - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+  command:
+    - "--config.file=/etc/alertmanager/alertmanager.yml"
+```
+
+Dans `prometheus.yml` :
+
+```yaml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+```
+
+Dans `alerts/api_alerts.yml` :
+
+```yaml
+groups:
+  - name: api.alerts
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(demo_http_requests_total{status=~"5.."}[2m]))
+          /
+          sum(rate(demo_http_requests_total[2m]))
+          > 0.05
+        for: 2m
+        labels:
+          severity: warning
+```
 
 Captures d'appui :
 
@@ -192,6 +341,24 @@ A observer :
 - comment changent les resultats
 - combien de series sont renvoyees
 - quels labels permettent de separer les series
+
+Ce que j'ai teste :
+
+```promql
+demo_http_requests_total
+```
+
+```promql
+demo_http_requests_total[1m]
+```
+
+```promql
+rate(demo_http_requests_total[1m])
+```
+
+```promql
+scalar(sum(demo_http_requests_total))
+```
 
 Captures d'appui :
 
@@ -237,6 +404,52 @@ Autre point important :
 
 - dans `app.py`, le compteur principal utilise les labels `method`, `endpoint` et `status`
 
+Ce que j'ai ajoute :
+
+Dans `rules/api_rules.yml` :
+
+```yaml
+- record: demo_api:requests:rate1m_by_endpoint
+  expr: |
+    sum by (endpoint) (
+      rate(demo_http_requests_total[1m])
+    )
+
+- record: demo_api:error_ratio:rate1m_by_endpoint
+  expr: |
+    sum by (endpoint) (
+      rate(demo_http_requests_total{status=~"5.."}[1m])
+    )
+    /
+    sum by (endpoint) (
+      rate(demo_http_requests_total[1m])
+    )
+
+- record: demo_api:requests:rate1m_top3_by_instance
+  expr: |
+    topk(3,
+      sum by (instance) (
+        rate(demo_http_requests_total[1m])
+      )
+    )
+```
+
+Les requetes a comprendre derriere ces regles :
+
+```promql
+sum by (endpoint) (rate(demo_http_requests_total[1m]))
+```
+
+```promql
+sum by (endpoint) (rate(demo_http_requests_total{status=~"5.."}[1m]))
+/
+sum by (endpoint) (rate(demo_http_requests_total[1m]))
+```
+
+```promql
+topk(3, sum by (instance) (rate(demo_http_requests_total[1m])))
+```
+
 Captures d'appui :
 
 Pour comprendre `instance` dans Docker Compose :
@@ -280,6 +493,60 @@ Ce qu'il faut travailler :
 - comprendre la structure d'un histogramme Prometheus
 - comprendre pourquoi `histogram_quantile(...)` s'appuie sur les series `_bucket`
 - comparer la consigne du TP et la doc sur `predict_linear`
+
+Ce que j'ai ajoute :
+
+Dans `rules/api_rules.yml` :
+
+```yaml
+- record: demo_api:orders_latency:p95_5m
+  expr: |
+    histogram_quantile(
+      0.95,
+      sum by (le, endpoint) (
+        rate(demo_http_request_duration_seconds_bucket{endpoint="/api/orders"}[5m])
+      )
+    )
+
+- record: demo_api:orders_latency:p95_5m_ms
+  expr: |
+    1000 *
+    histogram_quantile(
+      0.95,
+      sum by (le, endpoint) (
+        rate(demo_http_request_duration_seconds_bucket{endpoint="/api/orders"}[5m])
+      )
+    )
+
+- record: demo_api:requests:predict_1h_total
+  expr: |
+    predict_linear(
+      sum(demo_http_requests_total)[5m:10s],
+      3600
+    )
+
+- record: demo_api:requests:predict_1h_by_endpoint
+  expr: |
+    predict_linear(
+      sum by (endpoint) (demo_http_requests_total)[5m:10s],
+      3600
+    )
+```
+
+Les requetes a comprendre :
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, endpoint) (
+    rate(demo_http_request_duration_seconds_bucket{endpoint="/api/orders"}[5m])
+  )
+)
+```
+
+```promql
+predict_linear(demo_http_requests_total[1h], 3600)
+```
 
 Captures d'appui :
 
