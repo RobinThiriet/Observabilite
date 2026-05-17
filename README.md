@@ -143,7 +143,7 @@ Attention :
 Captures d'appui :
 
 ![Doc rule_files](image/Screenshot_4.png)
-![Rules chargees](image/Screenshot_27.png)
+
 
 ### Exercice 6 - Alertes et Alertmanager
 
