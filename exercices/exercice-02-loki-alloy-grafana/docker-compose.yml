@@ -1,0 +1,63 @@
+services:
+  loki:
+    image: grafana/loki:3.7.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy
+      - app-logs:/var/log/apps
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy
+    depends_on:
+      - loki
+
+  app:
+    image: busybox
+    container_name: app
+    volumes:
+      - app-logs:/var/log/apps
+    command: >
+      sh -c '
+        : > /var/log/apps/app.log;
+        i=0;
+        while true; do
+          i=$$((i+1));
+          echo "{\"level\":\"info\",\"user_id\":\"user-1\",\"message\":\"login success\",\"seq\":$$i}" >> /var/log/apps/app.log;
+          sleep 2;
+          i=$$((i+1));
+          echo "{\"level\":\"debug\",\"user_id\":\"user-2\",\"message\":\"debug details\",\"seq\":$$i}" >> /var/log/apps/app.log;
+          sleep 2;
+          i=$$((i+1));
+          echo "{\"level\":\"error\",\"user_id\":\"user-3\",\"message\":\"payment failed\",\"seq\":$$i}" >> /var/log/apps/app.log;
+          sleep 2;
+        done
+      '
+
+volumes:
+  app-logs:
+  alloy-data:
