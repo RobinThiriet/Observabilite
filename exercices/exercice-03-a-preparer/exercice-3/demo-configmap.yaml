@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-otel-config
+  namespace: default
+data:
+  OTEL_SERVICE_NAME: "flask-demo"
+  OTEL_RESOURCE_ATTRIBUTES: "service.namespace=demo,deployment.environment=kind"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://alloy.observability.svc:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_PYTHON_LOG_AUTO_INSTRUMENTATION: "true"
+  OTEL_PYTHON_LOG_CORRELATION: "true"
