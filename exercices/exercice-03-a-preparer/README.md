@@ -44,6 +44,19 @@ L'application Flask expose :
 
 Elle utilise `opentelemetry-instrument` au lancement pour emettre traces, logs et metriques via OTLP.
 
+Commandes de preparation de l'application :
+
+```bash
+cd exercices/exercice-03-a-preparer/exercice-3
+docker build -t flask-otel-demo:0.1.0 .
+```
+
+Lancement local possible pour verifier la construction de l'image :
+
+```bash
+docker run --rm -p 5000:5000 flask-otel-demo:0.1.0
+```
+
 ### 2. Reception OTLP dans Alloy
 
 Le fichier `config.alloy` ouvre :
@@ -53,6 +66,23 @@ Le fichier `config.alloy` ouvre :
 
 Les signaux recus sont ensuite rediriges vers un exporter `debug` pour verifier la reception.
 
+Ce que j'ai fait ici :
+
+- j'ai active un recepteur OTLP compatible gRPC et HTTP
+- j'ai laisse un exporter `debug` pour afficher les signaux recus
+- j'ai prepare `values-alloy.yaml` pour exposer les ports utiles dans Kubernetes
+
+Exemple de deploiement d'Alloy avec Helm :
+
+```bash
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+kubectl create namespace observability
+helm upgrade --install alloy grafana/alloy \
+  -n observability \
+  -f values-alloy.yaml
+```
+
 ### 3. Base Kubernetes
 
 Les manifestes fournis permettent de preparer :
@@ -60,6 +90,68 @@ Les manifestes fournis permettent de preparer :
 - la configuration OpenTelemetry de l'application
 - le deploiement du conteneur Flask
 - l'exposition du service dans le cluster
+
+Ce que j'ai configure :
+
+- une `ConfigMap` pour centraliser les variables OpenTelemetry
+- un `Deployment` pour lancer l'application Flask dans le cluster
+- un `Service` `ClusterIP` pour exposer l'application en interne
+
+Commandes de deploiement :
+
+```bash
+kubectl apply -f exercice-3/demo-configmap.yaml
+kubectl apply -f exercice-3/demo-deployment.yaml
+kubectl apply -f exercice-3/demo-service.yaml
+```
+
+Si l'image a ete construite localement pour un cluster `kind`, chargement possible avec :
+
+```bash
+kind load docker-image flask-otel-demo:0.1.0
+```
+
+## Demarche suivie
+
+Dans cette preparation, j'ai surtout cherche a mettre en place la chaine minimale suivante :
+
+1. creer une application Flask simple
+2. ajouter l'instrumentation OpenTelemetry
+3. preparer Alloy pour recevoir les donnees OTLP
+4. declarer les variables d'environnement necessaires
+5. preparer les manifestes Kubernetes pour pouvoir tester dans un cluster
+
+L'objectif n'etait donc pas seulement d'avoir des fichiers, mais de construire un premier chemin technique coherent entre l'application et Alloy.
+
+## Verifications possibles
+
+Verifier que les ressources Kubernetes existent :
+
+```bash
+kubectl get pods -A
+kubectl get svc -A
+kubectl get configmap -A
+```
+
+Verifier les logs de l'application :
+
+```bash
+kubectl logs deployment/demo
+```
+
+Verifier la reception cote Alloy :
+
+```bash
+kubectl logs -n observability deployment/alloy
+```
+
+Tester l'application :
+
+```bash
+kubectl port-forward svc/demo 5000:5000
+curl http://localhost:5000/
+curl http://localhost:5000/health
+```
 
 ## Limite actuelle
 
